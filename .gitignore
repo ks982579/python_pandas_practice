@@ -2,3 +2,6 @@ env/
 .ipynb_checkpoints/
 
 *.csv
+*.txt
+*.xlsx
+*.xls
