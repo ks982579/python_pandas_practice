@@ -69,6 +69,7 @@ class ParserController:
 
         ## reindex series to include 0 values
         series = series.reindex(self.__data.possible_urls, fill_value=0)
+        print(series.name)
 
         ## make DF
         def __apply_label(labels_dataframe, count):
@@ -82,9 +83,22 @@ class ParserController:
             return np.NAN
         
         usage_series = series.apply(lambda x: __apply_label(quantDF, x))
+        usage_series.name = "usage"
+
+        # Get Root
+        ## Every URL should has similar format
+        def for_apply(url: str):
+            return url[1:url.find("/", 1)]
+        _root_ser = pd.Series(series.index, index=series.index, name="root").apply(for_apply)
+
+        _df = pd.DataFrame({
+            series.name: series,
+            usage_series.name: usage_series,
+            _root_ser.name: _root_ser,
+        })
 
 
-        return usage_series
+        return _df
 
 
 class ParserData:
