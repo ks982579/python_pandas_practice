@@ -16,12 +16,28 @@ class ParserInterface:
         self.__exceptions = exceptions  # TODO: pass through functions
         self.__controller = ParserController(csv_file)
 
+    def show_usage_flags(self):
+        """To display a dataframe of counts and labeled usages"""
+        count_df = self.__controller.group_by_path()
+
+        return 1
+
 
 class ParserController:
     """Class to interact with and manipulate data to perform analysis."""
 
-    def __init__(self, csv_file: str):
-        self.__data = ParserData(csv_file)
+    def __init__(self, csv_file: str, urls_file: str):
+        self.__data = ParserData(csv_file, urls_file)
+
+    def testMe(self):
+        return self.group_by_path()
+
+    def group_by_path(self):
+        """Creates a series, indexed by path, displaying count for each path"""
+        _gdf = self.__data.dataframe.groupby(by="path")
+        _df = _gdf.count()["date"]
+        _df.name = "requests"
+        return _df
 
 
 class ParserData:
@@ -29,14 +45,19 @@ class ParserData:
     Designed to store and manipulate data for analysis.
     """
 
-    def __init__(self, csv_file_path):
+    def __init__(self, csv_file_path, possible_urls_path):
         self.__dataframe = self.__modify_df(csv_file_path)
+        self.__url_paths = self.__save_urls(possible_urls_path)
+
+    def testme(self, _p):
+        return self.__save_urls(_p)
 
     @staticmethod
     def __correct_path_format(url_series):
         """Method for correcting url path format to keep standard"""
 
         def slash_checker(url: str):
+            """Inner function for .apply() method to add missing slashes to url paths."""
             url = url.strip()
             if not (url.startswith("/")):
                 url = "/" + url
@@ -74,4 +95,20 @@ class ParserData:
     dataframe = property(
         fget=lambda self: self.__dataframe,
         doc="Providing restricted access to Dataframe.",
+    )
+
+    def __save_urls(self, txt_file_path):
+        """Take in urls from *.txt file and save them to a series."""
+        _urls = []
+        with open(txt_file_path, mode="r") as _f:
+            for _e in _f:
+                if _e.endswith(("\n", "\r")):
+                    _e = _e[:-1]
+                _urls.append(_e)
+
+        return self.__correct_path_format(pd.Series(_urls, name="urls"))
+
+    possible_urls = property(
+        fget=lambda self: self.__url_paths,
+        doc="Providing restricted access to possible urls Series"
     )
