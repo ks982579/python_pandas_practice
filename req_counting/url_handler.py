@@ -16,9 +16,14 @@ class ParserInterface:
         self.__exceptions = exceptions  # TODO: pass through functions
         self.__controller = ParserController(csv_file)
 
-    def show_usage_flags(self):
+    def show_usage_flags(self, quan_dict: dict[str, int]):
         """To display a dataframe of counts and labeled usages"""
-        count_df = self.__controller.group_by_path()
+        # -- Get The grouped data
+        count_ser = self.__controller.group_by_path()
+
+        # -- Get quantiles
+        quants = self.__controller.get_quants_df(count_ser, quan_dict)
+
 
         return 1
 
@@ -29,15 +34,57 @@ class ParserController:
     def __init__(self, csv_file: str, urls_file: str):
         self.__data = ParserData(csv_file, urls_file)
 
-    def testMe(self):
-        return self.group_by_path()
+    def testMe(self, _dy):
+        _ser = self.group_by_path()
+        return self.get_quants_df(_ser, _dy)
 
-    def group_by_path(self):
+    def group_by_path(self) -> pd.Series:
         """Creates a series, indexed by path, displaying count for each path"""
         _gdf = self.__data.dataframe.groupby(by="path")
-        _df = _gdf.count()["date"]
-        _df.name = "requests"
-        return _df
+        _ser = _gdf.count()["date"]
+        _ser.name = "requests"
+        return _ser
+    
+    def get_quants_df(self, series, percent_dict):
+
+        # Create quantile Dataframe
+        _dict = {
+            "labels": percent_dict.keys(),
+            "quantile": percent_dict.values(),
+        }
+        quantDF = pd.DataFrame(_dict)
+
+        # Adding thresholds
+        quantDF["quant_val"] = quantDF["quantile"].apply(lambda x: series.quantile(q=(x/100)))
+
+        # Do we have 'no-use'?
+        if not (0 in quantDF["quantile"].array):
+            # add on to last row
+            quantDF.loc[len(quantDF)] = {"labels": "none", "quantile": 0, "quant_val": 0}
+        
+        # ensure sorted
+        quantDF.sort_values("quantile", inplace=True)
+        quantDF.reset_index(drop=True, inplace=True)
+
+
+        ## reindex series to include 0 values
+        series = series.reindex(self.__data.possible_urls, fill_value=0)
+
+        ## make DF
+        def __apply_label(labels_dataframe, count):
+            for _i in range(len(labels_dataframe)):
+                # get row
+                _r = labels_dataframe.iloc[_i]
+                if count <= _r["quant_val"]:
+                    return _r["labels"]
+
+            # Should not make it to this return value
+            return np.NAN
+        
+        usage_series = series.apply(lambda x: __apply_label(quantDF, x))
+
+
+        return usage_series
 
 
 class ParserData:
